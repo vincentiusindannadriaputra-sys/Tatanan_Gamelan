@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengatur Tataan Gamelan - Layout Planner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        wood: {
+                            800: '#3D2314',
+                            900: '#26140A',
+                        },
+                        amber: {
+                            400: '#FBBF24',
+                            500: '#F59E0B',
+                            600: '#D97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #121212;
+            color: #E0E0E0;
+            user-select: none;
+        }
+
+        .canvas-bg {
+            background-color: #1e1b18;
+            background-image: 
+                radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e1b18;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a3b32;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d97706;
+        }
+
+        .stage-element {
+            touch-action: none;
+            transition: box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+
+        .stage-element.selected {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+            z-index: 40 !important;
+        }
+
+        .drag-ghost {
+            opacity: 0.4;
+        }
+
+        #stageWrapper {
+            transition: transform 0.05s ease-out;
+            transform-origin: 0 0;
+        }
+
+        .collapsible-content {
+            transition: max-height 0.25s ease-in-out, opacity 0.2s ease-in-out;
+            overflow: hidden;
+        }
+        .collapsible-content.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        .chevron-icon {
+            transition: transform 0.2s ease;
+        }
+        .collapsed-header .chevron-icon {
+            transform: rotate(-90deg);
+        }
+
+        /* Styling Teks Nama Gamelan Fleksibel & Berotasi */
+        .inst-label-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .inst-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.1;
+            font-size: clamp(8px, 1.6vw, 13px);
+            font-weight: 700;
+            color: #fbbf24;
+            pointer-events: none;
+            transition: transform 0.2s ease;
+        }
+
+        /* Selection marquee box */
+        #selectionMarquee {
+            position: absolute;
+            border: 1.5px dashed #f59e0b;
+            background-color: rgba(245, 158, 11, 0.15);
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- Header / Navbar -->
+    <header class="bg-wood-900 border-b border-amber-600/30 px-6 py-3 flex items-center justify-between shrink-0 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-wood-900 font-bold shadow">
+                <i class="fa-solid fa-drum text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-amber-500 text-lg leading-tight tracking-wide">Tataan Gamelan Studio</h1>
+                <p class="text-xs text-stone-400">Perencana & Layout Panggung Gamelan Interaktif</p>
+            </div>
+        </div>
+
+        <div class="hidden md:flex items-center space-x-5 text-xs text-stone-300 bg-stone-900/80 px-4 py-2 rounded-lg border border-stone-800">
+            <span><i class="fa-solid fa-hand-pointer text-amber-500 mr-1"></i><b>Shift/Ctrl+Klik / Drag Box:</b> Select Banyak</span>
+            <span><i class="fa-solid fa-keyboard text-amber-500 mr-1"></i><b>Ctrl+A:</b> Select Semua</span>
+            <span><i class="fa-solid fa-copy text-amber-500 mr-1"></i><b>Ctrl+C / V:</b> Copy & Paste</span>
+            <span><i class="fa-solid fa-trash text-amber-500 mr-1"></i><b>Del:</b> Hapus Panggung</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- SIDEBAR KIRI -->
+        <aside class="w-80 md:w-96 bg-stone-900 border-r border-stone-800 flex flex-col shrink-0 overflow-y-auto">
+            
+            <!-- SECTION 1: Luas Area -->
+            <div class="border-b border-stone-800 bg-stone-900/50">
+                <button onclick="toggleSection('secArea', this)" class="w-full p-4 flex items-center justify-between text-left hover:bg-stone-800/40 transition">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-2">
+                        <i class="fa-solid fa-ruler-combined"></i> Luas Area Panggung
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span id="scaleIndicator" class="text-[10px] bg-stone-800 text-stone-400 px-2 py-0.5 rounded">Skala: 1m = 50px</span>
+                        <i class="fa-solid fa-chevron-down text-xs text-stone-400 chevron-icon"></i>
+                    </div>
+                </button>
+                
+                <div id="secArea" class="collapsible-content px-4 pb-4 max-h-[300px]">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="text-[11px] text-stone-400 block mb-1">Panjang (cm)</label>
+                            <input type="number" id="areaLength" value="800" min="100" step="50"
+                                class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-stone-400 block mb-1">Lebar (cm)</label>
+                            <input type="number" id="areaWidth" value="600" min="100" step="50"
+                                class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                        </div>
+                    </div>
+
+                    <button id="btnSetArea" class="w-full bg-amber-600 hover:bg-amber-500 text-wood-900 font-semibold text-xs py-2 rounded transition shadow">
+                        <i class="fa-solid fa-check mr-1"></i> Terapkan Ukuran
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Pengaturan Skala Grid -->
+            <div class="border-b border-stone-800 bg-stone-900/40">
+                <button onclick="toggleSection('secGrid', this)" class="w-full p-4 flex items-center justify-between text-left hover:bg-stone-800/40 transition">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-2">
+                        <i class="fa-solid fa-border-all"></i> Pengaturan Skala Grid
+                    </h2>
+                    <i class="fa-solid fa-chevron-down text-xs text-stone-400 chevron-icon"></i>
+                </button>
+
+                <div id="secGrid" class="collapsible-content px-4 pb-4 max-h-[300px]">
+                    <div class="mb-3">
+                        <label class="text-[11px] text-stone-400 block mb-1">Ukuran Grid (cm)</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="inputGridSize" value="50" min="10" max="200" step="5"
+                                class="flex-1 bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                            <button id="btnSetGridSize" class="bg-stone-800 hover:bg-stone-700 text-amber-400 border border-amber-500/40 text-xs font-semibold px-3 py-1.5 rounded transition">
+                                Set Grid
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <label class="flex items-center space-x-2 text-stone-300 cursor-pointer">
+                            <input type="checkbox" id="chkShowGrid" checked class="rounded accent-amber-500">
+                            <span>Tampilkan Grid</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-stone-300 cursor-pointer">
+                            <input type="checkbox" id="chkSnapGrid" checked class="rounded accent-amber-500">
+                            <span>Snap to Grid</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Input Alat Musik Baru -->
+            <div class="border-b border-stone-800 bg-stone-900/30">
+                <button onclick="toggleSection('secInput', this)" class="w-full p-4 flex items-center justify-between text-left hover:bg-stone-800/40 transition">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> Input Alat Musik
+                    </h2>
+                    <i class="fa-solid fa-chevron-down text-xs text-stone-400 chevron-icon"></i>
+                </button>
+                
+                <div id="secInput" class="collapsible-content px-4 pb-4 max-h-[400px]">
+                    <div class="space-y-2">
+                        <div>
+                            <label class="text-[11px] text-stone-400 block mb-1">Nama Alat</label>
+                            <input type="text" id="inputInstName" placeholder="Contoh: Saron Demung"
+                                class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[11px] text-stone-400 block mb-1">Panjang (cm)</label>
+                                <input type="number" id="inputInstLength" placeholder="100" min="10"
+                                    class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                            </div>
+                            <div>
+                                <label class="text-[11px] text-stone-400 block mb-1">Lebar (cm)</label>
+                                <input type="number" id="inputInstWidth" placeholder="40" min="10"
+                                    class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                            </div>
+                        </div>
+                        <button id="btnAddInstrument" class="w-full mt-1 bg-stone-800 hover:bg-stone-700 text-amber-400 border border-amber-500/40 text-xs font-semibold py-2 rounded transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Tambah Ke Daftar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Daftar Alat Musik -->
+            <div class="flex-1 flex flex-col min-h-0">
+                <button onclick="toggleSection('secList', this)" class="w-full p-4 flex items-center justify-between text-left hover:bg-stone-800/40 transition">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-2">
+                        <i class="fa-solid fa-list text-xs"></i> Daftar Alat Gamelan
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span id="instCount" class="text-[10px] text-stone-400">0 Item</span>
+                        <i class="fa-solid fa-chevron-down text-xs text-stone-400 chevron-icon"></i>
+                    </div>
+                </button>
+                
+                <div id="secList" class="collapsible-content px-4 pb-4 flex-1 flex flex-col min-h-0 max-h-[1000px]">
+                    <button id="btnAddAllToStage" class="w-full mb-2.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-wood-900 border border-amber-500/40 text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-layer-group"></i> Masukkan Semua ke Panggung
+                    </button>
+                    <div id="instrumentList" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[120px]">
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- AREA UTAMA -->
+        <main class="flex-1 flex flex-col bg-stone-950 overflow-hidden relative">
+            
+            <div class="bg-stone-900/70 border-b border-stone-800 px-6 py-2 flex items-center justify-between text-xs text-stone-400 z-10">
+                <div class="flex items-center gap-3">
+                    <span class="font-semibold text-stone-200"><i class="fa-solid fa-compass text-amber-500 mr-1"></i> Area Panggung</span>
+                    <span id="dimensionDisplay" class="bg-stone-800 px-2 py-0.5 rounded text-[11px] text-amber-400 font-mono">800 cm x 600 cm</span>
+                </div>
+                <div class="text-[11px] text-stone-400">
+                    <span id="selectedInfo" class="italic">Belum ada alat dipilih</span>
+                </div>
+            </div>
+
+            <div id="viewport" class="flex-1 overflow-auto p-8 relative">
+                
+                <div id="stageWrapper">
+                    <div id="stageContainer" 
+                         class="relative border-2 border-amber-600/60 shadow-2xl rounded-lg canvas-bg transition-all duration-300"
+                         style="width: 700px; height: 525px;">
+                        
+                        <svg id="gridPattern" class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <pattern id="grid" width="35" height="35" patternUnits="userSpaceOnUse">
+                                    <path d="M 35 0 L 0 0 0 35" fill="none" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1"/>
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#grid)" />
+                        </svg>
+
+                        <div class="absolute top-2 left-3 text-[10px] uppercase font-bold tracking-widest text-amber-500/40 pointer-events-none select-none">
+                            Depan Panggung (Penonton)
+                        </div>
+
+                        <!-- Marquee Selection Box -->
+                        <div id="selectionMarquee"></div>
+
+                        <div id="stageLayer" class="absolute inset-0 overflow-hidden">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- FOOTER CONTROLS -->
+            <footer class="bg-stone-900 border-t border-stone-800 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-lg z-10">
+                <div class="flex items-center gap-2">
+                    <button id="btnRotateArea" class="bg-stone-800 hover:bg-stone-700 text-amber-400 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 flex items-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-rotate-right text-sm"></i> Putar Area
+                    </button>
+                    
+                    <button id="btnRotateSelected" class="bg-stone-800 hover:bg-stone-700 text-amber-400 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 flex items-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-arrows-rotate text-sm"></i> Putar (90°)
+                    </button>
+
+                    <button id="btnDuplicateSelected" class="bg-stone-800 hover:bg-stone-700 text-amber-400 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 flex items-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-clone text-sm"></i> Duplikat
+                    </button>
+
+                    <button id="btnEditSelected" class="bg-stone-800 hover:bg-stone-700 text-amber-400 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 flex items-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-pen-to-square text-sm"></i> Edit Ukuran
+                    </button>
+
+                    <!-- BUTTON HAPUS FOOTER: HANYA MENGHAPUS DARI PANGGUNG/TAMPILAN -->
+                    <button id="btnDeleteSelected" title="Hapus alat terpilih dari Panggung" class="bg-stone-800 hover:bg-red-900/50 text-red-400 hover:text-red-300 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 hover:border-red-700/50 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-trash-can text-sm"></i> Hapus dari Panggung
+                    </button>
+                </div>
+
+                <!-- ZOOM CONTROLS -->
+                <div class="flex items-center gap-2 bg-stone-950 px-3 py-1.5 rounded-lg border border-stone-800">
+                    <span class="text-xs text-stone-400 mr-1"><i class="fa-solid fa-magnifying-glass"></i> Zoom:</span>
+                    <button id="btnZoomOut" title="Zoom Out" class="w-7 h-7 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded flex items-center justify-center text-xs font-bold transition">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <span id="zoomLevelDisplay" class="text-xs font-mono font-bold text-amber-400 min-w-[45px] text-center">100%</span>
+                    <button id="btnZoomIn" title="Zoom In" class="w-7 h-7 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded flex items-center justify-center text-xs font-bold transition">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button id="btnZoomReset" title="Reset Zoom 100%" class="text-[10px] bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-200 px-2 py-1 rounded ml-1 transition">
+                        Reset
+                    </button>
+                </div>
+
+                <!-- FILE MANAGEMENT CONTROLS -->
+                <div class="flex items-center gap-2">
+                    <button id="btnClearStage" class="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-2 rounded-lg text-xs font-semibold border border-stone-700 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-broom text-sm"></i> Bersihkan Area
+                    </button>
+
+                    <input type="file" id="inputImportFile" accept=".json" class="hidden">
+                    
+                    <!-- LOAD BUTTON -->
+                    <button id="btnLoad" class="bg-stone-800 hover:bg-stone-700 text-amber-400 border border-amber-500/40 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition active:scale-95">
+                        <i class="fa-solid fa-folder-open text-sm"></i> Load
+                    </button>
+
+                    <!-- SAVE BUTTON -->
+                    <button id="btnSave" class="bg-amber-600 hover:bg-amber-500 text-wood-900 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition active:scale-95">
+                        <i class="fa-solid fa-floppy-disk text-sm"></i> Save
+                    </button>
+
+                    <!-- SAVE AS BUTTON -->
+                    <button id="btnSaveAs" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-wood-900 px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition transform active:scale-95">
+                        <i class="fa-solid fa-file-export text-sm"></i> Save As...
+                    </button>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- MODAL EDIT UKURAN ALAT -->
+    <div id="editModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-stone-900 border border-amber-600/50 rounded-xl p-5 w-80 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-stone-800 pb-2">
+                <h3 class="font-bold text-amber-500 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i> Edit Ukuran Alat
+                </h3>
+                <button id="btnCloseModal" class="text-stone-400 hover:text-stone-100 text-xs">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-stone-400 block mb-1">Nama Alat</label>
+                    <input type="text" id="modalInstName" class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-stone-400 block mb-1">Panjang (cm)</label>
+                        <input type="number" id="modalInstLength" min="10" class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-stone-400 block mb-1">Lebar (cm)</label>
+                        <input type="number" id="modalInstWidth" min="10" class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button id="btnCancelModal" class="flex-1 bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs py-2 rounded transition">
+                    Batal
+                </button>
+                <button id="btnSaveModal" class="flex-1 bg-amber-600 hover:bg-amber-500 text-wood-900 font-bold text-xs py-2 rounded transition shadow">
+                    Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SAVE AS -->
+    <div id="saveModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-stone-900 border border-amber-600/50 rounded-xl p-5 w-85 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-stone-800 pb-2">
+                <h3 class="font-bold text-amber-500 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> Simpan Project Layout
+                </h3>
+                <button id="btnCloseSaveModal" class="text-stone-400 hover:text-stone-100 text-xs">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-stone-400 block mb-1">Nama File Project (.json)</label>
+                    <input type="text" id="inputSaveFileName" placeholder="tataan-gamelan-acara-1" 
+                        class="w-full bg-stone-950 border border-stone-700 rounded px-3 py-1.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500">
+                </div>
+                <p class="text-[11px] text-stone-400 italic">File akan disimpan dalam format `.json` yang dapat di-load kembali sewaktu-waktu.</p>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button id="btnCancelSaveModal" class="flex-1 bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs py-2 rounded transition">
+                    Batal
+                </button>
+                <button id="btnConfirmSave" class="flex-1 bg-amber-600 hover:bg-amber-500 text-wood-900 font-bold text-xs py-2 rounded transition shadow">
+                    Unduh & Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PERINGATAN LOAD PROJECT -->
+    <div id="confirmLoadModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-stone-900 border border-amber-600/50 rounded-xl p-5 w-96 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-stone-800 pb-3">
+                <div class="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-amber-500 text-sm">Peringatan Load Layout</h3>
+                    <p class="text-[11px] text-stone-400">Anda sedang mengerjakan layout saat ini.</p>
+                </div>
+            </div>
+            
+            <p class="text-xs text-stone-300 leading-relaxed">
+                Apakah Anda ingin **menyimpan project saat ini** terlebih dahulu sebelum memuat layout baru? Data yang tidak disimpan akan hilang.
+            </p>
+
+            <div class="flex flex-col gap-2 pt-1">
+                <button id="btnSaveFirstAndLoad" class="w-full bg-amber-600 hover:bg-amber-500 text-wood-900 font-bold text-xs py-2 rounded transition shadow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> Simpan Dulu Lalu Memuat
+                </button>
+                <div class="flex gap-2">
+                    <button id="btnCancelLoadModal" class="flex-1 bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold text-xs py-2 rounded transition">
+                        Batal
+                    </button>
+                    <button id="btnDirectLoad" class="flex-1 bg-stone-800 hover:bg-red-900/40 text-red-400 border border-red-800/40 font-semibold text-xs py-2 rounded transition">
+                        Lanjut Tanpa Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-16 right-6 bg-amber-500 text-wood-900 font-semibold px-4 py-2.5 rounded-lg shadow-xl text-xs flex items-center gap-2 transition-all duration-300 translate-y-10 opacity-0 pointer-events-none z-50">
+        <i class="fa-solid fa-circle-info text-base"></i>
+        <span id="toastMsg">Notifikasi</span>
+    </div>
+
+    <script>
+        let areaRealWidth = 800;  
+        let areaRealHeight = 600; 
+        let areaRotation = 0;     
+        let pixelsPerCm = 0.8;    
+        let currentZoom = 1.0; 
+
+        let isSnapToGrid = true;
+        let isShowGrid = true;
+        let gridCmSize = 50;   
+
+        // DATA DEFAULT GAMELAN PUJO (DEMUNG SLENDRO & PELOG MASING-MASING 2)
+        let availableInstruments = [
+            { id: "default-1", name: "Bonang Panembung Slendro", length: 180, width: 80, color: "#d97706" },
+            { id: "default-2", name: "Bonang Panembung Pelog", length: 240, width: 80, color: "#d97706" },
+            { id: "default-3", name: "Bonang Barung Slendro", length: 180, width: 60, color: "#d97706" },
+            { id: "default-4", name: "Bonang Barung Pelog", length: 220, width: 60, color: "#d97706" },
+            { id: "default-5", name: "Bonang Penerus Slendro", length: 160, width: 60, color: "#d97706" },
+            { id: "default-6", name: "Bonang Penerus Pelog", length: 200, width: 60, color: "#d97706" },
+            { id: "default-7", name: "Demung Slendro 1", length: 120, width: 40, color: "#d97706" },
+            { id: "default-8", name: "Demung Slendro 2", length: 120, width: 40, color: "#d97706" },
+            { id: "default-9", name: "Demung Pelog 1", length: 130, width: 40, color: "#d97706" },
+            { id: "default-10", name: "Demung Pelog 2", length: 130, width: 40, color: "#d97706" },
+            { id: "default-11", name: "Saron Slendro 1", length: 80, width: 30, color: "#d97706" },
+            { id: "default-12", name: "Saron Slendro 2", length: 80, width: 30, color: "#d97706" },
+            { id: "default-13", name: "Saron Slendro 3", length: 80, width: 30, color: "#d97706" },
+            { id: "default-14", name: "Saron Slendro 4", length: 80, width: 30, color: "#d97706" },
+            { id: "default-15", name: "Saron Pelog 1", length: 90, width: 30, color: "#d97706" },
+            { id: "default-16", name: "Saron Pelog 2", length: 90, width: 30, color: "#d97706" },
+            { id: "default-17", name: "Saron Pelog 3", length: 90, width: 30, color: "#d97706" },
+            { id: "default-18", name: "Saron Pelog 4", length: 90, width: 30, color: "#d97706" },
+            { id: "default-19", name: "Peking Slendro", length: 80, width: 20, color: "#d97706" },
+            { id: "default-20", name: "Peking Pelog", length: 80, width: 20, color: "#d97706" },
+            { id: "default-21", name: "Slenthem Slendro", length: 100, width: 40, color: "#d97706" },
+            { id: "default-22", name: "Slenthem Pelog", length: 100, width: 40, color: "#d97706" },
+            { id: "default-23", name: "Gambang Slendro", length: 160, width: 60, color: "#d97706" },
+            { id: "default-24", name: "Gambang Pelog", length: 160, width: 60, color: "#d97706" },
+            { id: "default-25", name: "Gender Slendro", length: 120, width: 40, color: "#d97706" },
+            { id: "default-26", name: "Gender Pelog 1", length: 120, width: 40, color: "#d97706" },
+            { id: "default-27", name: "Gender Pelog 2", length: 120, width: 40, color: "#d97706" },
+            { id: "default-28", name: "Kenong 1", length: 60, width: 60, color: "#d97706" },
+            { id: "default-29", name: "Kenong 2", length: 60, width: 60, color: "#d97706" },
+            { id: "default-30", name: "Kenong 3", length: 100, width: 60, color: "#d97706" },
+            { id: "default-31", name: "Kenong 4", length: 100, width: 60, color: "#d97706" },
+            { id: "default-32", name: "Kenong 5", length: 100, width: 60, color: "#d97706" },
+            { id: "default-33", name: "Kenong 6", length: 100, width: 60, color: "#d97706" },
+            { id: "default-34", name: "Kenong 7", length: 140, width: 60, color: "#d97706" },
+            { id: "default-35", name: "Ketuk", length: 80, width: 50, color: "#d97706" },
+            { id: "default-36", name: "Kempyang 1", length: 100, width: 40, color: "#d97706" },
+            { id: "default-37", name: "Kempyang 2", length: 100, width: 40, color: "#d97706" },
+            { id: "default-38", name: "Kempul 1", length: 280, width: 80, color: "#d97706" },
+            { id: "default-39", name: "Kempul 2", length: 280, width: 80, color: "#d97706" },
+            { id: "default-40", name: "Gong", length: 280, width: 100, color: "#d97706" },
+            { id: "default-41", name: "Kendang", length: 160, width: 140, color: "#d97706" },
+            { id: "default-42", name: "Rebab", length: 80, width: 60, color: "#d97706" },
+            { id: "default-43", name: "Bedug", length: 100, width: 100, color: "#d97706" },
+            { id: "default-44", name: "Vokal", length: 440, width: 100, color: "#d97706" }
+        ];
+
+        let placedInstruments = []; 
+        let selectedInstanceIds = new Set(); // MENDUKUNG MULTI-SELECTION (SET)
+        let copiedInstrumentsData = []; // BUFFER UNTUK COPY-PASTE
+
+        let editingTargetId = null;
+        let currentProjectName = "tataan-gamelan-pujo";
+
+        const stageContainer = document.getElementById('stageContainer');
+        const stageWrapper = document.getElementById('stageWrapper');
+        const viewport = document.getElementById('viewport');
+        const stageLayer = document.getElementById('stageLayer');
+        const gridPattern = document.getElementById('gridPattern');
+        const instrumentListEl = document.getElementById('instrumentList');
+        const dimensionDisplay = document.getElementById('dimensionDisplay');
+        const scaleIndicator = document.getElementById('scaleIndicator');
+        const selectedInfo = document.getElementById('selectedInfo');
+        const instCountEl = document.getElementById('instCount');
+        const selectionMarquee = document.getElementById('selectionMarquee');
+
+        const areaLengthInput = document.getElementById('areaLength');
+        const areaWidthInput = document.getElementById('areaWidth');
+        const inputGridSize = document.getElementById('inputGridSize');
+        const chkShowGrid = document.getElementById('chkShowGrid');
+        const chkSnapGrid = document.getElementById('chkSnapGrid');
+        const inputName = document.getElementById('inputInstName');
+        const inputLen = document.getElementById('inputInstLength');
+        const inputWid = document.getElementById('inputInstWidth');
+
+        const zoomLevelDisplay = document.getElementById('zoomLevelDisplay');
+        const inputImportFile = document.getElementById('inputImportFile');
+
+        // Modal Elements
+        const editModal = document.getElementById('editModal');
+        const modalInstName = document.getElementById('modalInstName');
+        const modalInstLength = document.getElementById('modalInstLength');
+        const modalInstWidth = document.getElementById('modalInstWidth');
+
+        const saveModal = document.getElementById('saveModal');
+        const inputSaveFileName = document.getElementById('inputSaveFileName');
+        const confirmLoadModal = document.getElementById('confirmLoadModal');
+
+        function toggleSection(sectionId, buttonEl) {
+            const content = document.getElementById(sectionId);
+            if (!content) return;
+
+            content.classList.toggle('collapsed');
+            buttonEl.classList.toggle('collapsed-header');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderInstrumentList();
+            recalculateStageScale();
+            setupEventListeners();
+            setupDragAndDrop();
+            setupZoomEvents();
+            setupKeyboardShortcuts();
+            setupMarqueeSelection();
+        });
+
+        function recalculateStageScale() {
+            const maxW = viewport.clientWidth - 80;
+            const maxH = viewport.clientHeight - 80;
+
+            const scaleX = maxW / areaRealWidth;
+            const scaleY = maxH / areaRealHeight;
+            pixelsPerCm = Math.min(scaleX, scaleY, 1.5);
+
+            const stagePxWidth = areaRealWidth * pixelsPerCm;
+            const stagePxHeight = areaRealHeight * pixelsPerCm;
+
+            stageContainer.style.width = `${stagePxWidth}px`;
+            stageContainer.style.height = `${stagePxHeight}px`;
+
+            updateGridPattern();
+
+            dimensionDisplay.textContent = `${areaRealWidth} cm x ${areaRealHeight} cm`;
+            scaleIndicator.textContent = `Skala: 1m = ${Math.round(pixelsPerCm * 100)}px`;
+
+            renderStageElements();
+        }
+
+        function updateGridPattern() {
+            const gridPx = gridCmSize * pixelsPerCm;
+            const svgPattern = document.getElementById('grid');
+            svgPattern.setAttribute('width', gridPx);
+            svgPattern.setAttribute('height', gridPx);
+            gridPattern.querySelector('path').setAttribute('d', `M ${gridPx} 0 L 0 0 0 ${gridPx}`);
+        }
+
+        window.addEventListener('resize', recalculateStageScale);
+
+        function renderInstrumentList() {
+            instrumentListEl.innerHTML = '';
+            instCountEl.textContent = `${availableInstruments.length} Item`;
+
+            availableInstruments.forEach((inst) => {
+                const isPlaced = placedInstruments.some(p => p.id === inst.id);
+
+                const item = document.createElement('div');
+                item.className = `bg-stone-950 border border-stone-800 rounded-lg p-2 flex items-center justify-between group transition shadow-sm ${isPlaced ? 'opacity-75 border-amber-600/30' : 'hover:border-amber-600/50'}`;
+                item.setAttribute('draggable', isPlaced ? 'false' : 'true');
+                item.dataset.id = inst.id;
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2 overflow-hidden">
+                        <div class="w-7 h-7 rounded bg-amber-950/60 border border-amber-600/40 flex items-center justify-center text-amber-500 shrink-0 font-bold text-xs">
+                            <i class="fa-solid fa-vector-square"></i>
+                        </div>
+                        <div class="truncate">
+                            <h4 class="text-xs font-semibold text-stone-200 truncate">${inst.name}</h4>
+                            <p class="text-[10px] text-stone-400 font-mono">${inst.length} x ${inst.width} cm</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="addToStageDirectly('${inst.id}')" ${isPlaced ? 'disabled' : ''} title="${isPlaced ? 'Alat Sudah Ada di Panggung' : 'Masuk ke Panggung'}"
+                            class="${isPlaced ? 'bg-stone-800 text-stone-500 border-stone-800 cursor-not-allowed' : 'bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-wood-900 border-amber-600/30'} px-2 py-1 rounded text-[10px] font-semibold transition border">
+                            ${isPlaced ? 'Aktif' : 'Masuk'}
+                        </button>
+                        <button onclick="duplicateInstrumentFromSidebar('${inst.id}')" title="Ganda Alat"
+                            class="text-stone-500 hover:text-amber-400 p-1 rounded transition">
+                            <i class="fa-solid fa-clone text-xs"></i>
+                        </button>
+                        <button onclick="openEditModal('${inst.id}')" title="Edit Ukuran"
+                            class="text-stone-500 hover:text-amber-400 p-1 rounded transition">
+                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                        </button>
+
+                        <!-- DELETE SIDEBAR: MENGHAPUS ALAT DARI DAFTAR KIRI & PANGGUNG SECARA PERMANEN -->
+                        <button onclick="deleteInstrumentFromSidebar('${inst.id}')" title="Hapus Permanen dari Daftar & Panggung"
+                            class="text-stone-500 hover:text-red-400 p-1 rounded transition">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                `;
+
+                if (!isPlaced) {
+                    item.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify(inst));
+                        item.classList.add('drag-ghost');
+                    });
+
+                    item.addEventListener('dragend', () => {
+                        item.classList.remove('drag-ghost');
+                    });
+                }
+
+                instrumentListEl.appendChild(item);
+            });
+        }
+
+        function addToStageDirectly(instId) {
+            const inst = availableInstruments.find(i => i.id === instId);
+            if (!inst) return;
+
+            if (placedInstruments.some(p => p.id === instId)) {
+                showToast("Alat ini sudah ada di panggung!");
+                return;
+            }
+
+            const posX = Math.max(0, (areaRealWidth - inst.length) / 2);
+            const posY = Math.max(0, (areaRealHeight - inst.width) / 2);
+
+            placeInstrumentOnStage(inst, posX, posY);
+            showToast(`Instrumen ${inst.name} ditambahkan ke panggung`);
+        }
+
+        function addAllInstrumentsToStage() {
+            const unplaced = availableInstruments.filter(inst => !placedInstruments.some(p => p.id === inst.id));
+            if (unplaced.length === 0) {
+                showToast("Semua alat di daftar sudah berada di panggung!");
+                return;
+            }
+
+            let curX = 20;
+            let curY = 20;
+            let rowMaxH = 0;
+
+            unplaced.forEach((inst) => {
+                // Jika melebihi panjang area, turun ke baris berikutnya
+                if (curX + inst.length > areaRealWidth - 20) {
+                    curX = 20;
+                    curY += rowMaxH + 15;
+                    rowMaxH = 0;
+                }
+
+                // Pastikan tetap di dalam batas area panggung
+                const finalX = Math.max(0, Math.min(areaRealWidth - inst.length, curX));
+                const finalY = Math.max(0, Math.min(areaRealHeight - inst.width, curY));
+
+                placedInstruments.push({
+                    id: inst.id,
+                    name: inst.name,
+                    length: inst.length,
+                    width: inst.width,
+                    x: finalX,
+                    y: finalY,
+                    rotation: 0,
+                    color: inst.color || '#d97706'
+                });
+
+                curX += inst.length + 15;
+                if (inst.width > rowMaxH) {
+                    rowMaxH = inst.width;
+                }
+            });
+
+            selectedInstanceIds.clear();
+            renderInstrumentList();
+            renderStageElements();
+            updateSelectedInfo();
+            showToast(`${unplaced.length} alat gamelan berhasil dimasukkan ke panggung!`);
+        }
+
+        // HAPUS PERMANEN (DARI TOMBOL X SIDEBAR DAFTAR)
+        function deleteInstrumentFromSidebar(instId) {
+            availableInstruments = availableInstruments.filter(i => i.id !== instId);
+            placedInstruments = placedInstruments.filter(p => p.id !== instId);
+            selectedInstanceIds.delete(instId);
+
+            renderInstrumentList();
+            renderStageElements();
+            updateSelectedInfo();
+            showToast("Alat dihapus permanen dari daftar dan panggung");
+        }
+
+        // HAPUS PANGGUNG SAJA (DARI TOMBOL HAPUS FOOTER / TOMBOL DELETE KEYBOARD)
+        function deleteSelectedFromStageOnly() {
+            if (selectedInstanceIds.size === 0) {
+                showToast("Tidak ada alat di panggung yang dipilih!");
+                return;
+            }
+
+            const count = selectedInstanceIds.size;
+            placedInstruments = placedInstruments.filter(p => !selectedInstanceIds.has(p.id));
+            selectedInstanceIds.clear();
+
+            renderInstrumentList(); // Mengembalikan status tombol sidebar ke "Masuk"
+            renderStageElements();
+            updateSelectedInfo();
+            showToast(`${count} alat dihapus dari panggung (tetap ada di daftar)`);
+        }
+
+        function duplicateInstrumentFromSidebar(instId) {
+            const inst = availableInstruments.find(i => i.id === instId);
+            if (!inst) return;
+
+            const newId = 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            const newInst = {
+                id: newId,
+                name: `${inst.name} (Salinan)`,
+                length: inst.length,
+                width: inst.width,
+                color: inst.color || '#d97706'
+            };
+
+            availableInstruments.push(newInst);
+            renderInstrumentList();
+            showToast(`Alat ${inst.name} berhasil digandakan di daftar`);
+        }
+
+        function placeInstrumentOnStage(inst, cmX, cmY) {
+            const newItem = {
+                id: inst.id,
+                name: inst.name,
+                length: inst.length,
+                width: inst.width,
+                x: cmX,
+                y: cmY,
+                rotation: 0,
+                color: inst.color || '#d97706'
+            };
+
+            placedInstruments.push(newItem);
+            selectedInstanceIds.clear();
+            selectedInstanceIds.add(inst.id);
+            
+            renderInstrumentList();
+            renderStageElements();
+            updateSelectedInfo();
+        }
+
+        function renderStageElements() {
+            stageLayer.innerHTML = '';
+
+            placedInstruments.forEach((item) => {
+                const el = document.createElement('div');
+                el.id = item.id;
+                const isSelected = selectedInstanceIds.has(item.id);
+                el.className = `stage-element absolute rounded border-2 cursor-grab active:cursor-grabbing flex items-center justify-center select-none text-center shadow-lg ${isSelected ? 'selected' : 'border-amber-600/70'}`;
+                
+                el.style.backgroundColor = 'rgba(40, 24, 15, 0.9)';
+                
+                const isRotated = (item.rotation % 180 !== 0);
+                const currentCmW = isRotated ? item.width : item.length;
+                const currentCmH = isRotated ? item.length : item.width;
+
+                const pxW = currentCmW * pixelsPerCm;
+                const pxH = currentCmH * pixelsPerCm;
+
+                el.style.width = `${pxW}px`;
+                el.style.height = `${pxH}px`;
+                el.style.left = `${item.x * pixelsPerCm}px`;
+                el.style.top = `${item.y * pixelsPerCm}px`;
+
+                // Teks Nama Gamelan berotasi mengikuti arah instrumen (item.rotation)
+                el.innerHTML = `
+                    <div class="inst-label-container">
+                        <div class="inst-label" style="transform: rotate(${item.rotation}deg);">
+                            ${item.name}
+                        </div>
+                    </div>
+                `;
+
+                el.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    rotateInstance(item.id);
+                });
+
+                makeElementDraggable(el, item);
+
+                stageLayer.appendChild(el);
+            });
+        }
+
+        function selectInstance(id, isMulti = false) {
+            if (!isMulti) {
+                selectedInstanceIds.clear();
+                selectedInstanceIds.add(id);
+            } else {
+                if (selectedInstanceIds.has(id)) {
+                    selectedInstanceIds.delete(id);
+                } else {
+                    selectedInstanceIds.add(id);
+                }
+            }
+
+            document.querySelectorAll('.stage-element').forEach(el => {
+                if (selectedInstanceIds.has(el.id)) {
+                    el.classList.add('selected');
+                } else {
+                    el.classList.remove('selected');
+                }
+            });
+            updateSelectedInfo();
+        }
+
+        function selectAllInstrumentsOnStage() {
+            selectedInstanceIds.clear();
+            placedInstruments.forEach(p => selectedInstanceIds.add(p.id));
+            renderStageElements();
+            updateSelectedInfo();
+            showToast(`Semua (${selectedInstanceIds.size}) alat di panggung terpilih`);
+        }
+
+        function rotateInstance(id) {
+            const item = placedInstruments.find(i => i.id === id);
+            if (item) {
+                item.rotation = (item.rotation + 90) % 360;
+                renderStageElements();
+                showToast(`Rotasi ${item.name}: ${item.rotation}°`);
+            }
+        }
+
+        function rotateSelectedInstances() {
+            if (selectedInstanceIds.size === 0) {
+                showToast("Pilih alat musik di panggung terlebih dahulu");
+                return;
+            }
+            selectedInstanceIds.forEach(id => {
+                const item = placedInstruments.find(i => i.id === id);
+                if (item) item.rotation = (item.rotation + 90) % 360;
+            });
+            renderStageElements();
+            showToast(`Rotasi ${selectedInstanceIds.size} alat terpilih (+90°)`);
+        }
+
+        function openEditModal(id) {
+            editingTargetId = id;
+            const inst = availableInstruments.find(i => i.id === id);
+            if (!inst) return;
+
+            modalInstName.value = inst.name;
+            modalInstLength.value = inst.length;
+            modalInstWidth.value = inst.width;
+            editModal.classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            editModal.classList.add('hidden');
+            editingTargetId = null;
+        }
+
+        function saveEditModal() {
+            const name = modalInstName.value.trim();
+            const len = parseInt(modalInstLength.value);
+            const wid = parseInt(modalInstWidth.value);
+
+            if (!name || isNaN(len) || isNaN(wid) || len <= 0 || wid <= 0) {
+                showToast("Harap isi nama, panjang, dan lebar dengan benar");
+                return;
+            }
+
+            const inst = availableInstruments.find(i => i.id === editingTargetId);
+            if (inst) {
+                inst.name = name;
+                inst.length = len;
+                inst.width = wid;
+            }
+
+            const placed = placedInstruments.find(p => p.id === editingTargetId);
+            if (placed) {
+                placed.name = name;
+                placed.length = len;
+                placed.width = wid;
+            }
+
+            renderInstrumentList();
+            renderStageElements();
+            updateSelectedInfo();
+            showToast(`Ukuran ${name} berhasil diperbarui!`);
+
+            closeEditModal();
+        }
+
+        // DRAG & DROP BERSAMAAN UNTUK MULTI-SELECTION
+        function makeElementDraggable(el, item) {
+            let startMouseX = 0;
+            let startMouseY = 0;
+            let initialPositions = new Map(); // Menyimpan posisi awal seluruh instrumen terpilih
+            let isDragging = false;
+
+            const getClientPos = (e) => {
+                if (e.touches && e.touches.length > 0) {
+                    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+                return { x: e.clientX, y: e.clientY };
+            };
+
+            const onStart = (e) => {
+                if (e.type === 'mousedown' && e.button !== 0) return;
+
+                const isMultiKey = e.shiftKey || e.ctrlKey || e.metaKey;
+
+                if (!selectedInstanceIds.has(item.id)) {
+                    selectInstance(item.id, isMultiKey);
+                } else if (isMultiKey) {
+                    selectInstance(item.id, true);
+                    if (!selectedInstanceIds.has(item.id)) return;
+                }
+
+                const pos = getClientPos(e);
+                startMouseX = pos.x;
+                startMouseY = pos.y;
+                
+                // Simpan posisi awal dari SEMUA elemen yang sedang di-select
+                initialPositions.clear();
+                selectedInstanceIds.forEach(id => {
+                    const instObj = placedInstruments.find(p => p.id === id);
+                    if (instObj) {
+                        initialPositions.set(id, { x: instObj.x, y: instObj.y });
+                    }
+                });
+                
+                isDragging = true;
+
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', onEnd);
+                window.addEventListener('touchmove', onMove, { passive: false });
+                window.addEventListener('touchend', onEnd);
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+
+                const pos = getClientPos(e);
+                const dxCm = ((pos.x - startMouseX) / currentZoom) / pixelsPerCm;
+                const dyCm = ((pos.y - startMouseY) / currentZoom) / pixelsPerCm;
+
+                if (e.cancelable) e.preventDefault();
+
+                // Pindahkan SELURUH instrumen terpilih bersamaan secara relatif
+                selectedInstanceIds.forEach(id => {
+                    const instObj = placedInstruments.find(p => p.id === id);
+                    const initPos = initialPositions.get(id);
+                    if (instObj && initPos) {
+                        let newCmX = initPos.x + dxCm;
+                        let newCmY = initPos.y + dyCm;
+
+                        const isRotated = (instObj.rotation % 180 !== 0);
+                        const curW = isRotated ? instObj.width : instObj.length;
+                        const curH = isRotated ? instObj.length : instObj.width;
+
+                        newCmX = Math.max(0, Math.min(areaRealWidth - curW, newCmX));
+                        newCmY = Math.max(0, Math.min(areaRealHeight - curH, newCmY));
+
+                        instObj.x = newCmX;
+                        instObj.y = newCmY;
+
+                        const targetEl = document.getElementById(id);
+                        if (targetEl) {
+                            targetEl.style.left = `${instObj.x * pixelsPerCm}px`;
+                            targetEl.style.top = `${instObj.y * pixelsPerCm}px`;
+                        }
+                    }
+                });
+                
+                updateSelectedInfo();
+            };
+
+            const onEnd = () => {
+                if (isDragging) {
+                    isDragging = false;
+                    
+                    if (isSnapToGrid) {
+                        selectedInstanceIds.forEach(id => {
+                            const instObj = placedInstruments.find(p => p.id === id);
+                            if (instObj) {
+                                instObj.x = Math.round(instObj.x / gridCmSize) * gridCmSize;
+                                instObj.y = Math.round(instObj.y / gridCmSize) * gridCmSize;
+
+                                const isRotated = (instObj.rotation % 180 !== 0);
+                                const curW = isRotated ? instObj.width : instObj.length;
+                                const curH = isRotated ? instObj.length : instObj.width;
+
+                                instObj.x = Math.max(0, Math.min(areaRealWidth - curW, instObj.x));
+                                instObj.y = Math.max(0, Math.min(areaRealHeight - curH, instObj.y));
+
+                                const targetEl = document.getElementById(id);
+                                if (targetEl) {
+                                    targetEl.style.left = `${instObj.x * pixelsPerCm}px`;
+                                    targetEl.style.top = `${instObj.y * pixelsPerCm}px`;
+                                }
+                            }
+                        });
+                        updateSelectedInfo();
+                    }
+                }
+
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onEnd);
+                window.removeEventListener('touchmove', onMove);
+                window.removeEventListener('touchend', onEnd);
+            };
+
+            el.addEventListener('mousedown', onStart);
+            el.addEventListener('touchstart', onStart, { passive: false });
+        }
+
+        // MARQUEE DRAG-BOX SELECTION DI PANGGUNG
+        function setupMarqueeSelection() {
+            let isMarquee = false;
+            let startX = 0, startY = 0;
+
+            stageContainer.addEventListener('mousedown', (e) => {
+                // Hanya jika mousedown pada background panggung (bukan pada stage-element)
+                if (e.target.closest('.stage-element')) return;
+                if (e.button !== 0) return;
+
+                const rect = stageContainer.getBoundingClientRect();
+                startX = (e.clientX - rect.left) / currentZoom;
+                startY = (e.clientY - rect.top) / currentZoom;
+
+                isMarquee = true;
+                selectionMarquee.style.left = `${startX}px`;
+                selectionMarquee.style.top = `${startY}px`;
+                selectionMarquee.style.width = `0px`;
+                selectionMarquee.style.height = `0px`;
+                selectionMarquee.style.display = 'block';
+
+                if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                    selectedInstanceIds.clear();
+                    renderStageElements();
+                    updateSelectedInfo();
+                }
+
+                const onMouseMove = (moveEvt) => {
+                    if (!isMarquee) return;
+                    const curX = (moveEvt.clientX - rect.left) / currentZoom;
+                    const curY = (moveEvt.clientY - rect.top) / currentZoom;
+
+                    const minX = Math.min(startX, curX);
+                    const minY = Math.min(startY, curY);
+                    const width = Math.abs(curX - startX);
+                    const height = Math.abs(curY - startY);
+
+                    selectionMarquee.style.left = `${minX}px`;
+                    selectionMarquee.style.top = `${minY}px`;
+                    selectionMarquee.style.width = `${width}px`;
+                    selectionMarquee.style.height = `${height}px`;
+
+                    // Cek elemen yang bersinggungan dengan box marquee
+                    placedInstruments.forEach(item => {
+                        const isRot = (item.rotation % 180 !== 0);
+                        const itemW = (isRot ? item.width : item.length) * pixelsPerCm;
+                        const itemH = (isRot ? item.length : item.width) * pixelsPerCm;
+                        const itemX = item.x * pixelsPerCm;
+                        const itemY = item.y * pixelsPerCm;
+
+                        const intersects = !(itemX + itemW < minX || itemX > minX + width || itemY + itemH < minY || itemY > minY + height);
+
+                        if (intersects) {
+                            selectedInstanceIds.add(item.id);
+                        } else if (!moveEvt.shiftKey && !moveEvt.ctrlKey) {
+                            selectedInstanceIds.delete(item.id);
+                        }
+                    });
+
+                    document.querySelectorAll('.stage-element').forEach(el => {
+                        if (selectedInstanceIds.has(el.id)) {
+                            el.classList.add('selected');
+                        } else {
+                            el.classList.remove('selected');
+                        }
+                    });
+                    updateSelectedInfo();
+                };
+
+                const onMouseUp = () => {
+                    isMarquee = false;
+                    selectionMarquee.style.display = 'none';
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                };
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        // KEYBOARD SHORTCUTS (DEL, CTRL+C, CTRL+V, CTRL+A)
+        function setupKeyboardShortcuts() {
+            window.addEventListener('keydown', (e) => {
+                // Abaikan jika fokus di input field
+                if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+                const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+
+                // 1. DELETE / BACKSPACE KEY: Hapus terpilih dari panggung
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    deleteSelectedFromStageOnly();
+                }
+
+                // 2. CTRL + A: Select Semua Gamelan di Panggung
+                if (isCmdOrCtrl && e.key.toLowerCase() === 'a') {
+                    e.preventDefault();
+                    selectAllInstrumentsOnStage();
+                }
+
+                // 3. CTRL + C: Copy Gamelan Terpilih
+                if (isCmdOrCtrl && e.key.toLowerCase() === 'c') {
+                    if (selectedInstanceIds.size > 0) {
+                        e.preventDefault();
+                        copiedInstrumentsData = [];
+                        selectedInstanceIds.forEach(id => {
+                            const inst = availableInstruments.find(i => i.id === id) || placedInstruments.find(p => p.id === id);
+                            if (inst) copiedInstrumentsData.push(JSON.parse(JSON.stringify(inst)));
+                        });
+                        showToast(`${copiedInstrumentsData.length} gamelan disalin (Ctrl+C)`);
+                    }
+                }
+
+                // 4. CTRL + V: Paste Gamelan yang Disalin
+                if (isCmdOrCtrl && e.key.toLowerCase() === 'v') {
+                    if (copiedInstrumentsData.length > 0) {
+                        e.preventDefault();
+                        const newSelectedIds = new Set();
+                        copiedInstrumentsData.forEach(item => {
+                            const newId = 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                            const newInst = {
+                                id: newId,
+                                name: `${item.name} (Salinan)`,
+                                length: item.length,
+                                width: item.width,
+                                color: item.color || '#d97706'
+                            };
+                            availableInstruments.push(newInst);
+
+                            const placedObj = {
+                                id: newId,
+                                name: newInst.name,
+                                length: newInst.length,
+                                width: newInst.width,
+                                x: Math.min(areaRealWidth - newInst.length, (item.x || 100) + 20),
+                                y: Math.min(areaRealHeight - newInst.width, (item.y || 100) + 20),
+                                rotation: item.rotation || 0,
+                                color: newInst.color
+                            };
+                            placedInstruments.push(placedObj);
+                            newSelectedIds.add(newId);
+                        });
+
+                        selectedInstanceIds = newSelectedIds;
+                        renderInstrumentList();
+                        renderStageElements();
+                        updateSelectedInfo();
+                        showToast(`${copiedInstrumentsData.length} gamelan ditempelkan di panggung`);
+                    }
+                }
+            });
+        }
+
+        // FUNGSI ZOOM KE ARAH KURSOR MOUSE (ZOOM-TO-CURSOR)
+        function zoomAtPoint(zoomChange, mouseX, mouseY) {
+            const oldZoom = currentZoom;
+            let newZoom = Math.max(0.4, Math.min(2.5, oldZoom + zoomChange));
+            
+            if (newZoom === oldZoom) return;
+
+            const rect = viewport.getBoundingClientRect();
+            
+            const cursorX = mouseX - rect.left;
+            const cursorY = mouseY - rect.top;
+
+            const scrollX = viewport.scrollLeft + cursorX;
+            const scrollY = viewport.scrollTop + cursorY;
+
+            const zoomRatio = newZoom / oldZoom;
+
+            currentZoom = newZoom;
+            stageWrapper.style.transform = `scale(${currentZoom})`;
+            zoomLevelDisplay.textContent = `${Math.round(currentZoom * 100)}%`;
+
+            viewport.scrollLeft = scrollX * zoomRatio - cursorX;
+            viewport.scrollTop = scrollY * zoomRatio - cursorY;
+        }
+
+        function setZoomCenter(newZoom) {
+            const rect = viewport.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            zoomAtPoint(newZoom - currentZoom, centerX, centerY);
+        }
+
+        function setupZoomEvents() {
+            document.getElementById('btnZoomIn').addEventListener('click', () => {
+                const rect = viewport.getBoundingClientRect();
+                zoomAtPoint(0.15, rect.left + rect.width / 2, rect.top + rect.height / 2);
+            });
+
+            document.getElementById('btnZoomOut').addEventListener('click', () => {
+                const rect = viewport.getBoundingClientRect();
+                zoomAtPoint(-0.15, rect.left + rect.width / 2, rect.top + rect.height / 2);
+            });
+
+            document.getElementById('btnZoomReset').addEventListener('click', () => {
+                setZoomCenter(1.0);
+            });
+
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.1 : -0.1;
+                zoomAtPoint(delta, e.clientX, e.clientY);
+            }, { passive: false });
+        }
+
+        function setupDragAndDrop() {
+            stageContainer.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+
+            stageContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const rawData = e.dataTransfer.getData('text/plain');
+                if (!rawData) return;
+
+                try {
+                    const instData = JSON.parse(rawData);
+                    
+                    if (placedInstruments.some(p => p.id === instData.id)) {
+                        showToast("Alat ini sudah ada di panggung!");
+                        return;
+                    }
+
+                    const rect = stageContainer.getBoundingClientRect();
+                    const dropPxX = (e.clientX - rect.left) / currentZoom;
+                    const dropPxY = (e.clientY - rect.top) / currentZoom;
+
+                    let dropCmX = dropPxX / pixelsPerCm - (instData.length / 2);
+                    let dropCmY = dropPxY / pixelsPerCm - (instData.width / 2);
+
+                    if (isSnapToGrid) {
+                        dropCmX = Math.round(dropCmX / gridCmSize) * gridCmSize;
+                        dropCmY = Math.round(dropCmY / gridCmSize) * gridCmSize;
+                    }
+
+                    dropCmX = Math.max(0, Math.min(areaRealWidth - instData.length, dropCmX));
+                    dropCmY = Math.max(0, Math.min(areaRealHeight - instData.width, dropCmY));
+
+                    placeInstrumentOnStage(instData, dropCmX, dropCmY);
+                    showToast(`${instData.name} ditempatkan di panggung`);
+                } catch (err) {
+                    console.error("Drop error:", err);
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!stageContainer.contains(e.target) && !e.target.closest('button') && !e.target.closest('aside') && !e.target.closest('#editModal') && !e.target.closest('#saveModal') && !e.target.closest('#confirmLoadModal')) {
+                    selectedInstanceIds.clear();
+                    document.querySelectorAll('.stage-element').forEach(el => el.classList.remove('selected'));
+                    updateSelectedInfo();
+                }
+            });
+        }
+
+        // --- MANAJEMEN FILE: SAVE, SAVE AS, LOAD ---
+        function getProjectJSONData() {
+            return JSON.stringify({
+                stage: { 
+                    widthCm: areaRealWidth, 
+                    heightCm: areaRealHeight, 
+                    rotation: areaRotation, 
+                    gridSizeCm: gridCmSize 
+                },
+                availableInstruments: availableInstruments,
+                instruments: placedInstruments
+            }, null, 2);
+        }
+
+        async function executeSaveFile(fileName) {
+            const dataStr = getProjectJSONData();
+            const finalFileName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
+
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: finalFileName,
+                        types: [{
+                            description: 'JSON Layout Project',
+                            accept: { 'application/json': ['.json'] },
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(dataStr);
+                    await writable.close();
+                    currentProjectName = handle.name.replace('.json', '');
+                    showToast(`Project disimpan: ${handle.name}`);
+                    return true;
+                } catch (err) {
+                    if (err.name === 'AbortError') return false;
+                }
+            }
+
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = finalFileName;
+            a.click();
+            URL.revokeObjectURL(url);
+            currentProjectName = finalFileName.replace('.json', '');
+            showToast(`File diunduh: ${finalFileName}`);
+            return true;
+        }
+
+        function triggerLoadFileInput() {
+            inputImportFile.click();
+        }
+
+        function processLoadJSONFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+
+                    if (data.stage) {
+                        if (data.stage.widthCm) {
+                            areaRealWidth = data.stage.widthCm;
+                            areaLengthInput.value = areaRealWidth;
+                        }
+                        if (data.stage.heightCm) {
+                            areaRealHeight = data.stage.heightCm;
+                            areaWidthInput.value = areaRealHeight;
+                        }
+                        if (data.stage.gridSizeCm) {
+                            gridCmSize = data.stage.gridSizeCm;
+                            inputGridSize.value = gridCmSize;
+                        }
+                        if (typeof data.stage.rotation !== 'undefined') {
+                            areaRotation = data.stage.rotation;
+                            stageContainer.style.transform = `rotate(${areaRotation}deg)`;
+                        }
+                    }
+
+                    if (Array.isArray(data.availableInstruments)) {
+                        availableInstruments = data.availableInstruments;
+                    }
+
+                    if (Array.isArray(data.instruments)) {
+                        placedInstruments = data.instruments;
+                        selectedInstanceIds.clear();
+                    }
+
+                    currentProjectName = file.name.replace('.json', '');
+                    renderInstrumentList();
+                    recalculateStageScale();
+                    showToast(`Layout ${file.name} berhasil dimuat!`);
+                } catch (err) {
+                    console.error("Import error:", err);
+                    showToast("Gagal memuat file JSON layout!");
+                }
+                inputImportFile.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btnSetArea').addEventListener('click', () => {
+                const w = parseInt(areaLengthInput.value);
+                const h = parseInt(areaWidthInput.value);
+
+                if (w >= 100 && h >= 100) {
+                    areaRealWidth = w;
+                    areaRealHeight = h;
+                    recalculateStageScale();
+                    showToast(`Ukuran panggung diperbarui: ${w}x${h} cm`);
+                } else {
+                    showToast("Ukuran minimal panggung adalah 100x100 cm");
+                }
+            });
+
+            document.getElementById('btnSetGridSize').addEventListener('click', () => {
+                const val = parseInt(inputGridSize.value);
+                if (!isNaN(val) && val >= 10 && val <= 200) {
+                    gridCmSize = val;
+                    updateGridPattern();
+                    showToast(`Ukuran grid diubah menjadi ${gridCmSize}x${gridCmSize} cm`);
+                } else {
+                    showToast("Harap masukkan ukuran grid antara 10 cm - 200 cm");
+                }
+            });
+
+            chkShowGrid.addEventListener('change', (e) => {
+                isShowGrid = e.target.checked;
+                gridPattern.style.display = isShowGrid ? 'block' : 'none';
+            });
+
+            chkSnapGrid.addEventListener('change', (e) => {
+                isSnapToGrid = e.target.checked;
+                showToast(`Snap to Grid: ${isSnapToGrid ? 'Aktif' : 'Nonaktif'}`);
+            });
+
+            document.getElementById('btnAddAllToStage').addEventListener('click', addAllInstrumentsToStage);
+
+            document.getElementById('btnAddInstrument').addEventListener('click', () => {
+                const name = inputName.value.trim();
+                const len = parseInt(inputLen.value);
+                const wid = parseInt(inputWid.value);
+
+                if (!name || isNaN(len) || isNaN(wid) || len <= 0 || wid <= 0) {
+                    showToast("Harap isi nama, panjang, dan lebar dengan benar");
+                    return;
+                }
+
+                const newInst = {
+                    id: 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                    name: name,
+                    length: len,
+                    width: wid,
+                    color: '#d97706'
+                };
+
+                availableInstruments.push(newInst);
+                renderInstrumentList();
+                
+                inputName.value = '';
+                inputLen.value = '';
+                inputWid.value = '';
+                showToast(`Alat ${name} ditambahkan ke daftar`);
+            });
+
+            document.getElementById('btnRotateArea').addEventListener('click', () => {
+                areaRotation = (areaRotation + 90) % 360;
+                stageContainer.style.transform = `rotate(${areaRotation}deg)`;
+                showToast(`Area Panggung Diputar: ${areaRotation}°`);
+            });
+
+            document.getElementById('btnRotateSelected').addEventListener('click', rotateSelectedInstances);
+
+            document.getElementById('btnDuplicateSelected').addEventListener('click', () => {
+                if (selectedInstanceIds.size === 0) {
+                    showToast("Pilih alat musik terlebih dahulu");
+                    return;
+                }
+                const newSelected = new Set();
+                selectedInstanceIds.forEach(id => {
+                    const inst = availableInstruments.find(i => i.id === id) || placedInstruments.find(p => p.id === id);
+                    if (inst) {
+                        const newId = 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                        const newInst = {
+                            id: newId,
+                            name: `${inst.name} (Salinan)`,
+                            length: inst.length,
+                            width: inst.width,
+                            color: inst.color || '#d97706'
+                        };
+                        availableInstruments.push(newInst);
+
+                        const placedObj = {
+                            id: newId,
+                            name: newInst.name,
+                            length: newInst.length,
+                            width: newInst.width,
+                            x: Math.min(areaRealWidth - newInst.length, (inst.x || 100) + 20),
+                            y: Math.min(areaRealHeight - newInst.width, (inst.y || 100) + 20),
+                            rotation: inst.rotation || 0,
+                            color: newInst.color
+                        };
+                        placedInstruments.push(placedObj);
+                        newSelected.add(newId);
+                    }
+                });
+                selectedInstanceIds = newSelected;
+                renderInstrumentList();
+                renderStageElements();
+                updateSelectedInfo();
+                showToast(`${selectedInstanceIds.size} alat berhasil digandakan`);
+            });
+
+            document.getElementById('btnEditSelected').addEventListener('click', () => {
+                if (selectedInstanceIds.size === 1) {
+                    const firstId = Array.from(selectedInstanceIds)[0];
+                    openEditModal(firstId);
+                } else if (selectedInstanceIds.size > 1) {
+                    showToast("Pilih tepat 1 alat untuk mengedit ukurannya");
+                } else {
+                    showToast("Pilih alat musik terlebih dahulu");
+                }
+            });
+
+            document.getElementById('btnCloseModal').addEventListener('click', closeEditModal);
+            document.getElementById('btnCancelModal').addEventListener('click', closeEditModal);
+            document.getElementById('btnSaveModal').addEventListener('click', saveEditModal);
+
+            // TOMBOL HAPUS FOOTER (HANYA HAPUS DARI PANGGUNG/TAMPILAN)
+            document.getElementById('btnDeleteSelected').addEventListener('click', () => {
+                deleteSelectedFromStageOnly();
+            });
+
+            document.getElementById('btnClearStage').addEventListener('click', () => {
+                if (placedInstruments.length === 0) return;
+                if (confirm("Apakah Anda yakin ingin menghapus seluruh alat di panggung? (Alat di daftar sidebar tetap ada)")) {
+                    placedInstruments = [];
+                    selectedInstanceIds.clear();
+                    renderInstrumentList();
+                    renderStageElements();
+                    updateSelectedInfo();
+                    showToast("Seluruh panggung telah dibersihkan");
+                }
+            });
+
+            // TOMBOL SAVE
+            document.getElementById('btnSave').addEventListener('click', () => {
+                executeSaveFile(currentProjectName);
+            });
+
+            // TOMBOL SAVE AS...
+            document.getElementById('btnSaveAs').addEventListener('click', () => {
+                inputSaveFileName.value = currentProjectName;
+                saveModal.classList.remove('hidden');
+            });
+
+            document.getElementById('btnCloseSaveModal').addEventListener('click', () => saveModal.classList.add('hidden'));
+            document.getElementById('btnCancelSaveModal').addEventListener('click', () => saveModal.classList.add('hidden'));
+
+            document.getElementById('btnConfirmSave').addEventListener('click', async () => {
+                const name = inputSaveFileName.value.trim() || 'tataan-gamelan-layout';
+                saveModal.classList.add('hidden');
+                await executeSaveFile(name);
+            });
+
+            // TOMBOL LOAD
+            document.getElementById('btnLoad').addEventListener('click', () => {
+                const hasActiveData = availableInstruments.length > 0 || placedInstruments.length > 0;
+                if (hasActiveData) {
+                    confirmLoadModal.classList.remove('hidden');
+                } else {
+                    triggerLoadFileInput();
+                }
+            });
+
+            document.getElementById('btnCancelLoadModal').addEventListener('click', () => {
+                confirmLoadModal.classList.add('hidden');
+            });
+
+            document.getElementById('btnDirectLoad').addEventListener('click', () => {
+                confirmLoadModal.classList.add('hidden');
+                triggerLoadFileInput();
+            });
+
+            document.getElementById('btnSaveFirstAndLoad').addEventListener('click', async () => {
+                confirmLoadModal.classList.add('hidden');
+                await executeSaveFile(currentProjectName);
+                triggerLoadFileInput();
+            });
+
+            inputImportFile.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    processLoadJSONFile(file);
+                }
+            });
+        }
+
+        function updateSelectedInfo() {
+            if (selectedInstanceIds.size === 0) {
+                selectedInfo.textContent = "Belum ada alat dipilih";
+                selectedInfo.className = "italic text-stone-500";
+                return;
+            }
+
+            if (selectedInstanceIds.size === 1) {
+                const singleId = Array.from(selectedInstanceIds)[0];
+                const item = placedInstruments.find(i => i.id === singleId) || availableInstruments.find(i => i.id === singleId);
+                if (item) {
+                    const isPlaced = placedInstruments.some(p => p.id === item.id);
+                    selectedInfo.textContent = `Terpilih: ${item.name} (${item.length}x${item.width}cm) ${isPlaced ? `Pos: X:${Math.round(item.x)}, Y:${Math.round(item.y)}` : '(Di Sidebar)'}`;
+                    selectedInfo.className = "font-semibold text-amber-400";
+                }
+            } else {
+                selectedInfo.textContent = `Terpilih: ${selectedInstanceIds.size} Alat Gamelan (Multi-Select Active)`;
+                selectedInfo.className = "font-semibold text-amber-400";
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.textContent = msg;
+
+            toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+            
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
